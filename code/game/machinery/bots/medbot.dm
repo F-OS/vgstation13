@@ -2,7 +2,9 @@
 //MEDBOT PATHFINDING
 //MEDBOT ASSEMBLY
 #define INJECTION_TIME 30
-
+#define UPGRADE_SYNTH 1
+#define UPGRADE_SCANNER 2
+#define UPGRADE_NANOSYNTH 4
 /obj/item/weapon/medbot_cube
 	name = "advanced medibot cube"
 	desc = "Compressed Nanotrasen Advanced Medibot, ready for deployment. Just unwrap the cube!"
@@ -50,13 +52,27 @@
 	var/treatment_fire = TRICORDRAZINE
 	var/treatment_tox = TRICORDRAZINE
 	var/treatment_virus = SPACEACILLIN
+	var/treatment_painkiller = TRAMADOL
+	var/treatment_eye = IMIDAZOLINE
+	var/treatment_ear = INACUSIATE
+	var/treatment_rad = HYRONALIN
+	var/treatment_oxy_secondary = WATER
+	var/treatment_tox_secondary = WATER
+	var/treatment_brute_secondary = WATER
+	var/treatment_fire_secondary = WATER
+	var/eye = 0
+	var/ear = 0
+	var/radiation = 0
+	var/broken = 0
 	var/declare_treatment = 0 //When attempting to treat a patient, should it notify everyone wearing medhuds?
 	var/shut_up = 0 //self explanatory :)
 	var/declare_crit = 1 //If active, the bot will transmit a critical patient alert to MedHUD users.
 	var/declare_cooldown = 0 //Prevents spam of critical patient alerts.
 	var/pai_analyze_mode = FALSE //Used to switch between injecting people or analyzing them (for pAIs)
 	var/reagent_id = null
+	var/reagent_id_secondary = null
 	var/last_spoke = 0
+	var/upgraded = 0
 
 	bot_type = MED_BOT
 
@@ -255,6 +271,37 @@
 			updateUsrDialog()
 			return
 
+	else if (istype(W, /obj/item/weapon/botupgrade/mbotchem))
+		if(!istype(src, /obj/machinery/bot/medbot/mysterious) && upgraded ^ UPGRADE_SYNTH)
+			to_chat(user, "You insert [W] into the medibot's upgrade slot, giving it the ability to produce more targeted treatments.")
+			treatment_tox = ANTI_TOXIN
+			treatment_brute = BICARIDINE
+			treatment_fire = KELOTANE
+			treatment_oxy = DEXALIN
+			upgraded = upgraded | UPGRADE_SYNTH
+			qdel(W)
+		else
+			to_chat(user, "That upgrade slot already has a upgrade soldered in.")
+		
+	else if (istype(W, /obj/item/weapon/botupgrade/nanosynth))
+		if(upgraded ^ UPGRADE_NANOSYNTH)
+			to_chat(user, "You insert [W] into the medibot's upgrade slot, giving it the ability to produce more powerful, dual-step treatments.")
+			treatment_tox_secondary = PEPTOBISMOL
+			treatment_brute_secondary = SYNTHOCARISOL
+			treatment_fire_secondary = DERMALINE
+			treatment_oxy_secondary = DEXALINP
+			treatment_oxy = INAPROVALINE
+			upgraded = upgraded | UPGRADE_NANOSYNTH
+			qdel(W)
+		else
+			to_chat(user, "That upgrade slot already has a upgrade soldered in.")
+	else if (istype(W, /obj/item/weapon/botupgrade/scanner))
+		if(upgraded ^ UPGRADE_SCANNER)
+			to_chat(user, "You insert [W] into the medibot's upgrade slot, giving it the ability to scan patients for uncommon injuries.")
+			upgraded = upgraded | UPGRADE_SCANNER
+			qdel(W)
+		else
+			to_chat(user, "That upgrade slot already has a upgrade soldered in.")
 	else
 		. = ..()
 		if (. && isturf(loc))
@@ -413,7 +460,23 @@
 
 	if((C.getToxLoss() >= heal_threshold) && (!C.reagents.has_reagent(treatment_tox)))
 		return 1
-
+	if(ishuman(C) && (upgraded & UPGRADE_SCANNER))
+		var/mob/living/carbon/human/H = C
+		var/datum/organ/internal/eyes/E = H.internal_organs_by_name["eyes"]
+		if(E.damage > 5)
+			eye = TRUE
+			return 1
+		if(C.ear_damage && C.ear_deaf)
+			ear = TRUE
+			return 1
+		if(C.radiation > 10)
+			radiation = TRUE
+			return 1
+		for(var/name in H.organs_by_name)
+			var/datum/organ/external/e = H.organs_by_name[name]
+			if(e.is_broken())
+				broken = TRUE
+				return 1
 
 	for(var/datum/disease/D in C.viruses)
 		if((D.stage > 1) || (D.spread_type == AIRBORNE))
@@ -463,6 +526,8 @@
 	if (!reagent_id && (C.getBruteLoss() >= heal_threshold))
 		if(!C.reagents.has_reagent(treatment_brute))
 			reagent_id = treatment_brute
+			if(upgraded & UPGRADE_NANOSYNTH)
+				reagent_id_secondary = treatment_brute_secondary
 			if((C.getBruteLoss() <= 50) && (C.getBruteLoss() > 0) && (shut_up == 0))
 				playsound(src.loc, 'sound/medbot/Minor_lacerations.ogg', 35, channel = CHANNEL_MEDBOTS)
 				say("Minor lacerations detected!")
@@ -475,6 +540,8 @@
 	if (!reagent_id && (C.getOxyLoss() >= heal_threshold))
 		if(!C.reagents.has_reagent(treatment_oxy))
 			reagent_id = treatment_oxy
+			if(upgraded & UPGRADE_NANOSYNTH)
+				reagent_id_secondary = treatment_oxy_secondary
 			if(shut_up == 0)
 				playsound(src.loc, 'sound/medbot/Blood_loss.ogg', 35, channel = CHANNEL_MEDBOTS)
 				say("Blood loss detected!")
@@ -483,6 +550,8 @@
 	if (!reagent_id && (C.getFireLoss() >= heal_threshold))
 		if(!C.reagents.has_reagent(treatment_fire))
 			reagent_id = treatment_fire
+			if(upgraded & UPGRADE_NANOSYNTH)
+				reagent_id_secondary = treatment_fire_secondary
 			if(shut_up == 0)
 				playsound(src.loc, 'sound/medbot/Heat_damage.ogg', 35, channel = CHANNEL_MEDBOTS)
 				say("Warning! Extreme heat damage detected!")
@@ -492,6 +561,8 @@
 	if (!reagent_id && (C.getToxLoss() >= heal_threshold))
 		if(!C.reagents.has_reagent(treatment_tox))
 			reagent_id = treatment_tox
+			if(upgraded & UPGRADE_NANOSYNTH)
+				reagent_id_secondary = treatment_tox_secondary
 			if(shut_up == 0)
 				playsound(src.loc, 'sound/medbot/Blood_toxins.ogg', 35, channel = CHANNEL_MEDBOTS)
 				say("Warning! Blood toxin levels detected!")
@@ -499,8 +570,43 @@
 				playsound(src.loc, 'sound/medbot/Antitoxin_shot.ogg', 35, channel = CHANNEL_MEDBOTS)
 				say("Antitoxin administered!")
 				sleep(25)
-
-
+	if(upgraded & UPGRADE_SCANNER)
+		if(!reagent_id && eye)
+			if(!C.reagents.has_reagent(treatment_eye))
+				reagent_id = treatment_eye
+				if(shut_up == 0)
+					say("Ocular damage detected!")
+					sleep(30)
+					say("Glaucoma inhibitor administed.")
+					sleep(25)
+		if(!reagent_id && ear)
+			if(!C.reagents.has_reagent(treatment_ear))
+				reagent_id = treatment_ear
+				if(shut_up == 0)
+					say("Traumatic rupture of eardrum detected!")
+					sleep(30)
+					say("Tympanic growth accelerator administered.")
+					sleep(25)
+		if(!reagent_id && radiation)
+			if(!C.reagents.has_reagent(treatment_rad))
+				reagent_id = treatment_rad
+				if(shut_up == 0)
+					say("Acute radiation syndrome detected!")
+					sleep(30)
+					say("Thyrodial Protectors and Radiochelation Inhibitors Administered.")
+					sleep(25)
+		if(!reagent_id && broken)
+			if(!C.reagents.has_reagent(treatment_painkiller))
+				reagent_id = treatment_painkiller
+				if(shut_up == 0)
+					say("Major fracture detected!")
+					sleep(30)
+					say("Morphine Adminstered.")
+					sleep(25)
+		eye = 0
+		ear = 0
+		radiation = 0
+		broken = 0
 	if(!reagent_id) //If they don't need any of that they're probably cured!
 		oldpatient = patient
 		patient = null
@@ -529,6 +635,8 @@
 		else
 			if(!patient.reagents.has_reagent(reagent_id) && !emagged) //Somebody got there first
 				patient.reagents.add_reagent(reagent_id,injection_amount)
+				if(!patient.reagents.has_reagent(reagent_id_secondary) && upgraded & UPGRADE_NANOSYNTH)
+					patient.reagents.add_reagent(reagent_id_secondary,injection_amount)
 				succesful_inject = 1
 	if(succesful_inject)
 		visible_message("<span class='danger'>[src] injects [patient] with the syringe!</span>")
@@ -536,6 +644,7 @@
 	icon_state = "[icon_initial][on]"
 	currently_healing = 0
 	reagent_id = null
+	reagent_id_secondary = null
 
 	return
 
