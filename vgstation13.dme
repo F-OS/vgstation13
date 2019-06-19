@@ -2162,6 +2162,7 @@
 #include "code\modules\research\designs\armor.dm"
 #include "code\modules\research\designs\bluespace.dm"
 #include "code\modules\research\designs\borg_upgrades.dm"
+#include "code\modules\research\designs\bot_upgrades.dm"
 #include "code\modules\research\designs\data.dm"
 #include "code\modules\research\designs\engineering.dm"
 #include "code\modules\research\designs\medical.dm"
