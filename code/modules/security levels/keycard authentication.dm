@@ -84,8 +84,10 @@ var/global/list/obj/machinery/keycard_auth/authenticators = list()
 			<li><A href='?src=\ref[src];triggerevent=Red alert'>Red alert</A></li>"}
 		if((get_security_level() in list("red", "delta")))
 			dat += "<li><A href='?src=\ref[src];triggerevent=Emergency Response Team'>Emergency Response Team</A></li>"
+			dat += "<li><A href='?src=\ref[src];triggerevent=Emergency Robotic Engineering Team'>Emergency Robotic Engineering Team</A></li>"
 		else
 			dat += "<li>Emergency Response Team (Disabled while below Code Red)</li>"
+			dat += "<li>Emergency Robotic Engineering Team (Disabled while below Code Red)</li>"
 		dat += {"<li><A href='?src=\ref[src];triggerevent=Grant Emergency Maintenance Access'>Grant Emergency Maintenance Access</A></li>
 			<li><A href='?src=\ref[src];triggerevent=Revoke Emergency Maintenance Access'>Revoke Emergency Maintenance Access</A></li>
 			</ul>"}
@@ -93,8 +95,8 @@ var/global/list/obj/machinery/keycard_auth/authenticators = list()
 	if(screen == 2)
 
 		dat += "Please swipe your card to authorize the following event: <b>[event]</b>"
-		if(event == "Emergency Response Team")
-			dat += "<p>Given reason for ERT request: '[ert_reason]'"
+		if(event == "Emergency Response Team" || event == "Emergency Robotic Engineering Team")
+			dat += "<p>Given reason for ERT/ERET request: '[ert_reason]'"
 
 		dat += "<p><A href='?src=\ref[src];reset=1'>Back</A>"
 		user << browse(dat, "window=keycard_auth;size=500x300")
@@ -115,6 +117,13 @@ var/global/list/obj/machinery/keycard_auth/authenticators = list()
 			ert_reason = stripped_input(usr, "Please input the reason for calling an Emergency Response Team. This may be all the briefing they get before arriving at the station.", "Response Team Justification", ert_reason)
 			if(!ert_reason)
 				to_chat(usr, "<span class='warning'>You are required to give a reason to call an ERT.</span>")
+				return
+			if(!Adjacent(usr) || usr.incapacitated())
+				return
+		if(href_list["triggerevent"] == "Emergency Robotic Engineering Team")
+			ert_reason = stripped_input(usr, "Please input the reason for calling an Emergency Robotic Engineering Team. This will be added to their KEEPER lawset.", "Robotic Team Justification", ert_reason)
+			if(!ert_reason)
+				to_chat(usr, "<span class='warning'>You are required to give a reason to call an ERET.</span>")
 				return
 			if(!Adjacent(usr) || usr.incapacitated())
 				return
@@ -188,6 +197,11 @@ var/global/list/obj/machinery/keycard_auth/authenticators = list()
 			response_team.mission = ert_reason
 			response_team.trigger_strike()
 			feedback_inc("alert_keycard_auth_ert",1)
+		if("Emergency Robotic Engineering Team")
+			var/datum/striketeam/ert/mommi_team = new()
+			mommi_team.mission = ert_reason
+			mommi_team.trigger_strike()
+			feedback_inc("alert_keycard_auth_eret",1)
 
 var/global/maint_all_access = 0
 
